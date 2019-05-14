@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!-- Standard Meta -->
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+
+<!-- Site Properties -->
+<title>PaaS-TA Sample web page for node.js</title>
+<% include include/header_css.ejs %>
+</head>
+<body>
+	<div class=" container-scroller">
+		<!-- partial:partials/_navbar.html -->
+		<% include include/top_navbar.ejs %>
+
+		<!-- partial -->
+		<div class="container-fluid">
+			<div class="row row-offcanvas row-offcanvas-right">
+			<!-- partial:partials/_sidebar.html -->
+			<% include include/menu.ejs %>
+
+			<!-- partial -->
+			<div class="content-wrapper">
+				<h3 class="page-heading mb-4">센서 모니터링</h3>
+				<div class="card-deck">
+					<div class="card-body">
+							<h5 class="card-title">장치 선택</h5>
+							<div class="form-row">
+								<div class="col">
+									<select id="adnList" class="form-control">
+										<option value="none" selected>등록된 ADN이 없습니다.</option>
+									</select>
+								</div>
+								<div class="col">
+									<select id="sensorList" class="form-control">
+										<option value="none" selected>등록된 센서가 없습니다.</option>
+									</select>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div id="setting_layer" class="card col-lg-12 px-0 mb-4" style="display: none;">
+						<div class="card-body">
+							<h5 class="card-title">Sensor monitor</h5>
+
+							<div class="form-row">
+								<div class="form-group col-md-6">
+									<label>Sensing Value Auto Update</label>
+									<select class="form-control" id="sensing-value-auto-update">
+											<!-- <option value="1000">1 Sec</option> -->
+										<%
+											for(var i = 1; i < 12; i++) {
+										%>
+											<option value="<%=i * 5 * 1000%>"><%=i * 5%> Sec</option>
+										<%
+											}
+										%>
+									</select>
+								</div>
+							</div>
+
+							<div class="form-row">
+								<div class="form-group col-md-6">
+									<div class="btn btn-info btn-wd" id="report-submit" onclick="startMonitoring()">Start Sensor monitor</div>
+									<div class="btn btn-danger btn-wd" id="sensor-stop-submit" onclick="stopMonitoring()" style="background-color: #EB5E28; color:#fff; display: none;">Stop sensing report</div>
+									<div class="btn btn-primary btn-wd" data-toggle="modal" data-target="#sensingReportModal">Sensin value report</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div id="monitor_layer" class="card col-lg-12 px-0 mb-4" style="display: none;">
+						<div class="card-body">
+							<h5 class="card-title">Sensor monitoring</h5>
+							<div class="card-deck mb-2 text-center">
+								<div class="card mb-4 box-shadow">
+								<div class="card-header">
+									<h4 class="my-0 font-weight-normal" id="monitor_thingId"></h4>
+								</div>
+									<div class="card-body">
+										<h1 class="card-title pricing-card-title" id="monitor_value"></h1>
+										<ul class="list-unstyled mt-3 mb-4">
+											<li id="monitor_name"></li>
+											<li id="monitor_time"></li>
+										</ul>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			<!-- partial -->
+			</div>
+		</div>
+	</div>
+
+	<!-- Modal view for sensing report -->
+	<div class="modal" tabindex="-1" role="dialog" id="sensingReportModal">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">Sening value report</h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-row">
+						<div class="col">
+							<label for="sensing-name">Sensing sensor name</label>
+							<input type="text" id="sensing-name" class="form-control" placeholder="Enter sensing sensor name" aria-label="Enter sensing sensor name">
+						</div>
+						<div class="col">
+							<label for="sensing-value">Sensing value</label>
+							<input type="text" id="sensing-value" class="form-control" placeholder="Enter sensing value" aria-label="Enter sensing value">
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-primary" onclick="sensingReport()">등록</button>
+					<button type="button" class="btn btn-secondary" data-dismiss="modal">취소</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Modal view for ADN registration -->
+	<div class="modal" tabindex="-1" role="dialog" id="adnRegistrationModal">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">ADN 등록</h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-row">
+						<div class="col">
+							<label for="adn-name">ADN 명칭</label>
+							<input type="text" id="adn-name" class="form-control" placeholder="Enter ADN name" aria-label="Enter ADN name">
+						</div>
+						<div class="col">
+							<label for="adn-id">ADN ID</label>
+							<input type="text" id="adn-id" class="form-control" placeholder="Enter ADN ID(Identification)" aria-label="Enter ADN ID(Identification)">
+						</div>
+					</div>
+					<br>
+					<div class="form-row">
+						<div class="col">
+							<label for="descriptions">ADN ID 는 'S' 또는 'C' 문자열로 시작되어야 합니다.</label>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-primary" onclick="sendADNResist()">등록</button>
+					<button type="button" class="btn btn-secondary" data-dismiss="modal">취소</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Modal view for Sensor registration -->
+	<div class="modal" tabindex="-1" role="dialog" id="sensorRegistrationModal">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title">ADN 등록</h5>
+					<button type="button" class="close" data-dismiss="modal" aria-label="Close">
+					<span aria-hidden="true">&times;</span>
+					</button>
+				</div>
+				<div class="modal-body">
+					<div class="form-row">
+						<div class="col">
+							<label for="sensorRegistAdnList">ADN 선택</label>
+							<select id="sensorRegistAdnList" class="form-control">
+								<option value="none" selected>등록된 ADN이 없습니다.</option>
+							</select>
+						</div>
+					</div>
+					<br>
+					<div class="form-row">
+						<div class="col">
+							<label for="sensor-name">센서 이름</label>
+							<input type="text" id="sensor-name" class="form-control" placeholder="Enter sensor name" aria-label="Enter sensor name">
+						</div>
+						<div class="col">
+							<label for="sensor-id">센서 ID</label>
+							<input type="text" id="sensor-id" class="form-control" placeholder="Enter sensor id" aria-label="Enter sensor id">
+						</div>
+						<div class="col">
+							<label for="sensor-history">센서 히스토리</label>
+							<input type="text" id="sensor-history" class="form-control" placeholder="Enter sensor history count" aria-label="Enter sensor history count">
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-primary" onclick="sendSensorResist()">등록</button>
+					<button type="button" class="btn btn-secondary" data-dismiss="modal">취소</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<% include include/footer_js.ejs %>
+
+	<script>
+
+	var timeoutSerial = null;
+	$(document).ready(function() {
+		loadAdns();
+
+		$('#sensorRegistrationModal').on('show.bs.modal', function (e) {
+			$.ajax({
+				type : 'get',
+				url : '/oneM2M/adns',
+				async : false,
+				success : function(data, status, request) {
+					if (data.code != 200){
+						alert('정보를 가져올 수 없습니다. - ' + data.code);
+						return;
+					}
+
+					var selector = $('#sensorRegistAdnList');
+					selector.unbind('change');
+					selector.empty();
+
+					var options = null;
+					if(selector.prop)
+						options = selector.prop('options');
+					else 
+						options = selector.attr('options');
+
+					options[options.length] = new Option('ADN을 선택하세요', '', true);
+					$.each(data.items, function (i, item) {
+						if(item.typ === 2) {
+							options[options.length] = new Option(item.nm, item.nm);
+						}
+					});
+				},
+				dataType : 'json'
+			});
+		})
+	});
+
+	function loadAdns() {
+		$.ajax({
+			type : 'get',
+			url : '/oneM2M/adns',
+			async : false,
+			success : function(data, status, request) {
+				if (data.code != 200){
+					alert('정보를 가져올 수 없습니다. - ' + data.code);
+					return;
+				}
+
+				var selector = $('#adnList');
+				selector.unbind('change');
+				selector.empty();
+
+				var options = null;
+				if(selector.prop)
+					options = selector.prop('options');
+				else 
+					options = selector.attr('options');
+
+				options[options.length] = new Option('ADN을 선택하세요', null, true);
+				$.each(data.items, function (i, item) {
+					if(item.typ === 2) {
+						options[options.length] = new Option(item.nm, item.nm);
+					}
+				});
+
+				if(options.length > 1) {
+					selector.change(function(){
+						selectedAdn($(this).val());
+					});
+				}
+			},
+			dataType : 'json'
+		});
+	}
+
+	function selectedAdn(adnId) {
+		$.ajax({
+			type : 'get',
+			url : '/oneM2M/sensors',
+			data : {
+				adnId : adnId
+			},
+			async : false,
+			success : function(data, status, request) {
+				if (data.code != 200){
+					alert('정보를 가져올 수 없습니다. - ' + data.code);
+					return;
+				}
+
+				if ($('#setting_layer').is(':visible') === true) {
+					$('#setting_layer').hide();
+				}
+
+				if ($('#monitor_layer').is(':visible') === true) {
+					$('#monitor_layer').hide();
+				}
+
+				stopMonitoring();
+
+				var selector = $('#sensorList');
+				selector.unbind('change');
+				selector.empty();
+
+				var options = null;
+				if(selector.prop)
+					options = selector.prop('options');
+				else 
+					options = selector.attr('options');
+
+				options[options.length] = new Option('센서를 선택하세요', null, true);
+				$.each(data.items, function (i, item) {
+					if(item.typ === 3) {
+						options[options.length] = new Option(item.nm, item.nm);
+					}
+				});
+
+				if(options.length > 1) {
+					selector.change(function() {
+						if ($('#setting_layer').is(':visible') === false) {
+							$('#setting_layer').show();
+						}
+						stopMonitoring();
+					});
+				}
+			},
+			dataType : 'json'
+		});
+	}
+
+	function sensingReport() {
+		if(isNullId('sensing-name')){
+			alert('등록할 센서 이름을 입력하세요');
+			$('#sensing-name').focus();
+			return;
+		}
+
+		if(isNullId('sensing-value')){
+			alert('등록할 센싱값을 입력하세요');
+			$('#sensing-value').focus();
+			return;
+		}
+
+		$.ajax({
+			type : 'post',
+			url : '/oneM2M/sensors/sensor/report',
+			data : {
+				adnId : $("#adnList option:selected").val(),
+				sensorId : $("#sensorList option:selected").val(),
+				value : $('#sensing-value').val(),
+				name : $('#sensing-name').val()
+			},
+			async : false,
+			success : function(data, status, request) {
+				switch(data.code) {
+					case 201 :
+						console.log('센싱 정보를 등록하였습니다.' +  $('#sensing-name').val() + '-' + $('#sensing-name').val());
+					break;
+					case 404 :
+						alert('등록된 장치 정보를 찾을 수 없습니다.' + data.code);
+					break;
+					default:
+						alert('정보를 등록할 수 없습니다. - ' + data.code);
+					break
+				}
+
+				$('#sensingReportModal').modal('hide');
+			},
+			dataType : 'json'
+		});
+	}
+
+	var count = 0;
+	function startMonitoring() {
+		$.ajax({
+			type : 'get',
+			url : '/oneM2M/sensors/sensor/lastValue',
+			data : {
+				adnId : $("#adnList option:selected").val(),
+				sensorId : $("#sensorList option:selected").val()
+			},
+			async : false,
+			success : function(data, status, request) {
+				if (data.code != 200){
+					alert('정보를 가져올 수 없습니다. - ' + data.code);
+					stopMonitoring();
+					return;
+				}
+
+				if (isNull(data.item)) {
+					alert('등록된 센싱 정보가 없습니다.');
+					stopMonitoring();
+					return;
+				}
+				try{
+				data.item = JSON.parse(data.item);
+				}catch(e){
+					alert('등록된 센싱 정보가 없습니다.');
+					stopMonitoring();
+					return;
+				}
+
+				if ($('#report-submit').is(':visible') === true) {
+					$('#report-submit').hide();
+				}
+
+				if ($('#monitor_layer').is(':visible') === false) {
+					$('#monitor_layer').show();
+				}
+				var sensorValue = "";
+				try{
+					sensorValue = data.item.value[Object.keys(data.item.value)[0]];
+				}catch(e){}
+
+				$('#sensor-stop-submit').show();
+				$('#monitor_thingId').text(data.item.thingId);
+				$('#monitor_value').text(sensorValue);
+				$('#monitor_name').text(data.item.resourceId);
+
+				var time = data.item.time;
+				time = time.substring(0,4) + '-'
+				     + time.substring(4,6) + '-'
+					 + time.substring(6,8) + ' '
+					 + time.substring(8,10) + ':'
+					 + time.substring(10,12) + ':'
+					 + time.substring(12,14);
+				$('#monitor_time').text(time);
+
+				count++;
+				console.log('> run count : ' + count);
+				console.log('> sensing-value-auto-update : ' + $("#sensing-value-auto-update option:selected").val());
+
+				timeoutSerial = setTimeout(startMonitoring, $("#sensing-value-auto-update option:selected").val());
+			},
+			dataType : 'json'
+		});
+	}
+
+	function stopMonitoring() {
+		if(timeoutSerial) {
+			if ($('#monitor_layer').is(':visible') === true) {
+				$('#monitor_layer').hide();
+			}
+
+			clearTimeout(timeoutSerial);
+		}
+
+		$('#report-submit').show();
+		$('#sensor-stop-submit').hide();
+
+		count = 0;
+	}
+
+	function sendADNResist() {
+		if(isNullId('adn-name')){
+			alert('등록할 ADN 이름을 입력하세요');
+			$('#adn-name').focus();
+			return;
+		}
+
+		if(isNullId('adn-id')){
+			alert('등록할 ADN ID를 입력하세요');
+			$('#adn-id').focus();
+			return;
+		}
+
+		var adnId = $('#adn-id').val();
+		if(!adnId.startsWith('S') && !adnId.startsWith('C')) {
+			alert('ADN ID 는 \'S\' 또는 \'C\' 문자열로 시작되어야 합니다.');
+			$('#adn-id').focus();
+			return;
+		}
+		
+		$.ajax({
+			type : 'post',
+			url : '/oneM2M/adns/adn',
+			data : {
+				adnId : adnId,
+				adnName : $('#adn-name').val()
+			},
+			async : false,
+			success : function(data, status, request) {
+				switch(data.code) {
+					case 201 :
+						loadAdns();
+
+						// clear adn input values
+						$('#adn-id').val('');
+						$('#adn-name').val('');
+
+						alert('ADN 이 등록되었습니다.');
+						console.log('ADN 정보를 등록하였습니다.' +  adnId + '-' + $('#adn-name').val());
+						$('#adnRegistrationModal').modal('hide');
+					break;
+					case 409 :
+						alert('ADN ID 가 중복되었습니다. - ' + adnId);
+					break;
+					default:
+						alert('정보를 등록할 수 없습니다. - ' + data.code);
+					break
+				}
+			},
+			dataType : 'json'
+		});
+	}
+
+	function sendSensorResist() {
+		if(isNull($("#sensorRegistAdnList option:selected").val())) {
+			alert('ADN 을 먼저 선택하세요.');
+			return;
+		}
+
+		if(isNullId('sensor-name')){
+			alert('등록할 센서 이름을 입력하세요');
+			$('#sensor-name').focus();
+			return;
+		}
+
+		if(isNullId('sensor-id')){
+			alert('등록할 센서 ID를 입력하세요');
+			$('#sensor-id').focus();
+			return;
+		}
+
+		if(isNullId('sensor-history')){
+			alert('등록할 센서의 이력 관리 수를 입력하세요');
+			$('#sensor-history').focus();
+			return;
+		}
+
+		$.ajax({
+			type : 'post',
+			url : '/oneM2M/sensors/sensor',
+			data : {
+				adnId : $("#sensorRegistAdnList option:selected").val(),
+				sensorId : $('#sensor-id').val(),
+				sensorName : $('#sensor-name').val(),
+				sensorHistory : $('#sensor-history').val()
+			},
+			async : false,
+			success : function(data, status, request) {
+				switch(data.code) {
+					case 201 :
+						loadAdns();
+
+						alert('SENSOR가 등록되었습니다.');
+						console.log('SENSOR 정보를 등록하였습니다.' +  $("#sensorRegistAdnList option:selected").val() + '-' + $('#sensor-name').val());
+						$('#sensorRegistrationModal').modal('hide');
+					break;
+					case 409 :
+						alert('SENSOR ID 가 중복되었습니다. - ' + $('#sensor-id').val());
+					break;
+					default:
+						alert('정보를 등록할 수 없습니다. - ' + data.code + '-' + data.message);
+					break
+				}
+			},
+			dataType : 'json'
+		});
+	}
+	</script>
+</body>
+
+</html>
